@@ -1,0 +1,1 @@
+Read docs/05-product-spec.md and docs/06-validation.md. Update the specification to reflect recorded feedback. Do not invent approvals. List unresolved decisions. Draft docs/07-build-plan.md as small ordered milestones with expected outputs and relevant checks. Start with ingest and deterministic matching. Do not implement yet.

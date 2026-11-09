@@ -1,0 +1,43 @@
+# Waitlist API (docs/09). Listens on loopback only (W3); nginx proxies to it.
+# Installed to /etc/systemd/system/. Owner: devops. Entry point and flags from dev's waitlist/cli.py.
+# Runs as a dedicated user, not ec2-user: ec2-user has passwordless sudo.
+[Unit]
+Description=Lifecycle Copilot waitlist API
+After=network.target
+
+[Service]
+User=waitlist
+Group=waitlist
+# the waitlist/ package is copied into app/; python -m finds it from the working dir
+WorkingDirectory=/opt/lifecycle-waitlist/app
+Environment=WAITLIST_DB=/var/lib/lifecycle-waitlist/waitlist.db
+# serve: refuses non-loopback hosts, no access log, no server/date headers
+ExecStart=/opt/lifecycle-waitlist/venv/bin/python -m waitlist serve --host 127.0.0.1 --port 8081
+Restart=on-failure
+RestartSec=3
+
+# /var/lib/lifecycle-waitlist, 0700, owned by waitlist
+StateDirectory=lifecycle-waitlist
+StateDirectoryMode=0700
+UMask=0077
+
+# Hardening: read-only system, no outbound network, small memory cap
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+LockPersonality=yes
+RestrictSUIDSGID=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+IPAddressDeny=any
+IPAddressAllow=localhost
+SystemCallFilter=@system-service
+MemoryMax=150M
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,23 @@
+product,version,build,edition_group,os_eos,source_url,asserted_at,status,note
+Windows 11,21H2,22000,home_pro,2023-10-10,https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information,2026-10-24,approved,
+Windows 11,21H2,22000,enterprise_education,2024-10-08,https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information,2026-10-24,approved,
+Windows 11,22H2,22621,home_pro,2024-10-08,https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information,2026-10-24,approved,
+Windows 11,22H2,22621,enterprise_education,2025-10-14,https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information,2026-10-24,approved,
+Windows 11,23H2,22631,home_pro,2025-11-11,https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information,2026-10-24,approved,
+Windows 11,23H2,22631,enterprise_education,2026-11-10,https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information,2026-10-24,approved,
+Windows 11,24H2,26100,home_pro,2026-10-13,https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information,2026-10-24,approved,
+Windows 11,24H2,26100,enterprise_education,2027-10-12,https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information,2026-10-24,approved,
+Windows 11,25H2,26200,home_pro,2027-10-12,https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information,2026-10-24,approved,
+Windows 11,25H2,26200,enterprise_education,2028-10-10,https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information,2026-10-24,approved,
+Windows 11,26H1,28000,home_pro,2028-03-14,https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information,2026-10-24,approved,
+Windows 11,26H1,28000,enterprise_education,2029-03-13,https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information,2026-10-24,approved,
+Windows 11,26H2,26300,home_pro,2028-10-10,https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information,2026-10-24,approved,
+Windows 11,26H2,26300,enterprise_education,2029-10-09,https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information,2026-10-24,approved,
+Windows 10,22H2,19045,all,2025-10-14,https://learn.microsoft.com/en-us/lifecycle/products/windows-10-home-and-pro,2026-10-24,approved,
+Windows 10,21H2,19044,home_pro,2023-06-13,https://learn.microsoft.com/en-us/lifecycle/products/windows-10-home-and-pro,2026-10-24,approved,
+Windows 10,21H2,19044,enterprise_education,2024-06-11,https://learn.microsoft.com/en-us/lifecycle/products/windows-10-enterprise-and-education,2026-10-24,approved,
+Windows 10,LTSC 2019,17763,ltsc,2029-01-09,https://learn.microsoft.com/en-us/lifecycle/products/windows-10-enterprise-ltsc-2019,2026-10-24,approved,OS EOS is end of extended support. Mainstream ended 2024-01-09.
+Windows 10,LTSC 2021,19044,ltsc,2027-01-12,https://learn.microsoft.com/en-us/lifecycle/products/windows-10-enterprise-ltsc-2021,2026-10-24,approved,
+Windows 11,LTSC 2024,26100,ltsc,2029-10-09,https://learn.microsoft.com/en-us/lifecycle/products/windows-11-enterprise-ltsc-2024,2026-10-24,approved,
+Windows 10,IoT LTSC 2021,19044,iot_ltsc,2032-01-13,https://learn.microsoft.com/en-us/lifecycle/products/windows-10-iot-enterprise-ltsc-2021,2026-10-24,approved,OS EOS is end of extended support. Mainstream ends 2027-01-12.
+Windows 11,IoT LTSC 2024,26100,iot_ltsc,2034-10-10,https://learn.microsoft.com/en-us/lifecycle/products/windows-11-iot-enterprise-ltsc-2024,2026-10-24,approved,OS EOS is end of extended support. Mainstream ends 2029-10-09.

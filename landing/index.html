@@ -1,0 +1,673 @@
+<title>Lifecycle Copilot</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Lifecycle Copilot turns a raw CMDB export into a decided technology-lifecycle report, with the reason behind every date it fills in.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Lifecycle Copilot",
+  "applicationCategory": "BusinessApplication",
+  "applicationSubCategory": "IT Asset Management / Technology Lifecycle Management",
+  "operatingSystem": "Web",
+  "description": "Turns a raw CMDB export plus the prior period's lifecycle sheet into a decided technology-lifecycle workbook: EOL/EOS dates, a Manage/Renew/Retire call per asset, and the basis for every derived value.",
+  "author": { "@type": "Organization", "name": "TechOps ITAM team" },
+  "softwareVersion": "0.1 (pilot, v1.0 in build)",
+  "featureList": [
+    "Deterministic serial-then-hostname matching, no fuzzy matching",
+    "Carry-forward of lifecycle and disposition between periods",
+    "Fill-blanks-only lifecycle inference with cited basis",
+    "Manage / Renew / Retire recommendation with rationale",
+    "Six-sheet Excel export: Report, Summary, Matching Logic, Match Detail, Dropped, Data Quality",
+    "Provenance and data-quality checks on every inbound file"
+  ]
+}
+</script>
+<style>
+/* Layout: a lifecycle ledger. Hero pairs the claim with a live-looking workbook strip; sections run down a single 1120px column with a left label rail on wide screens. */
+:root {
+  --paper: #f2f4f6;
+  --sheet: #ffffff;
+  --ink: #142033;
+  --ink-soft: #4a5668;
+  --rule: #d7dde5;
+  --cobalt: #2340b0;
+  --cobalt-wash: #e6ebfa;
+  --manage: #1f7a4d;
+  --renew: #a35f00;
+  --retire: #b3261e;
+  --manage-wash: #e3f2ea;
+  --renew-wash: #fbefdc;
+  --retire-wash: #fbe5e3;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f1520; --sheet: #161e2c; --ink: #e6ebf2; --ink-soft: #a3aec0; --rule: #2a3547;
+    --cobalt: #8ea4ff; --cobalt-wash: #1c2645;
+    --manage: #5fcf95; --renew: #f0b35a; --retire: #ff8a80;
+    --manage-wash: #15301f; --renew-wash: #352612; --retire-wash: #3a1a18;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f1520; --sheet: #161e2c; --ink: #e6ebf2; --ink-soft: #a3aec0; --rule: #2a3547;
+  --cobalt: #8ea4ff; --cobalt-wash: #1c2645;
+  --manage: #5fcf95; --renew: #f0b35a; --retire: #ff8a80;
+  --manage-wash: #15301f; --renew-wash: #352612; --retire-wash: #3a1a18;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 1rem/1.6 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1120px; margin: 0 auto; }
+a { color: var(--cobalt); }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 3px; border-radius: 4px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+p { margin: 0; }
+.label {
+  font: 500 0.75rem/1 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+}
+
+/* Top bar */
+.top { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding-block: 22px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; font: 700 1.05rem/1 var(--display); color: var(--ink); text-decoration: none; }
+.brand svg { flex: none; }
+.top nav { display: flex; gap: 20px; flex-wrap: wrap; font-size: 0.9rem; }
+.top nav a { color: var(--ink-soft); text-decoration: none; }
+.top nav a:hover { color: var(--ink); }
+
+/* Hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 48px; align-items: center; padding-block: 40px 72px; }
+.hero h1 { font-size: clamp(2.4rem, 5.2vw, 4.1rem); font-weight: 800; line-height: 1.02; }
+.hero h1 em { font-style: normal; color: var(--cobalt); }
+.hero .lede { margin-top: 22px; font-size: 1.15rem; color: var(--ink-soft); max-width: 34em; }
+.cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 30px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 18px; border-radius: 6px; font: 600 0.95rem/1 var(--body);
+  text-decoration: none; border: 1px solid var(--ink); cursor: pointer;
+}
+.btn.primary { background: var(--ink); color: var(--paper); }
+.btn.ghost { background: transparent; color: var(--ink); }
+.btn:hover { transform: translateY(-1px); }
+.status-line { margin-top: 22px; font: 400 0.85rem/1.4 var(--mono); color: var(--ink-soft); }
+.status-line b { color: var(--manage); font-weight: 500; }
+
+/* Ledger strip in hero */
+.ledger { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; box-shadow: 0 18px 40px -24px rgba(20, 32, 51, 0.35); overflow: hidden; min-width: 0; }
+.ledger-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--rule); flex-wrap: wrap; }
+.tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.tabs span { font: 500 0.7rem/1 var(--mono); padding: 6px 8px; border-radius: 4px; color: var(--ink-soft); }
+.tabs span.on { background: var(--cobalt-wash); color: var(--cobalt); }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.82rem; }
+th { text-align: left; font: 500 0.68rem/1.2 var(--mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); padding: 10px 12px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+td { padding: 10px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+td.mono { font-family: var(--mono); font-size: 0.78rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+td.basis { color: var(--ink-soft); font-size: 0.76rem; min-width: 190px; }
+.pill { display: inline-block; font: 600 0.7rem/1 var(--body); padding: 5px 8px; border-radius: 999px; }
+.pill.manage { background: var(--manage-wash); color: var(--manage); }
+.pill.renew { background: var(--renew-wash); color: var(--renew); }
+.pill.retire { background: var(--retire-wash); color: var(--retire); }
+.days { display: block; margin-top: 4px; font-size: 0.7rem; color: var(--ink-soft); }
+.days.hot { color: var(--retire); font-weight: 500; }
+.ledger-foot { padding: 10px 16px; border-top: 1px solid var(--rule); font: 400 0.7rem/1.4 var(--mono); color: var(--ink-soft); }
+
+/* Sections */
+section { padding-block: 64px; border-top: 1px solid var(--rule); }
+.sec { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 40px; }
+.sec > .label { padding-top: 10px; }
+.sec h2 { font-size: clamp(1.7rem, 3vw, 2.3rem); font-weight: 700; line-height: 1.12; max-width: 22em; }
+.sec .intro { margin-top: 14px; color: var(--ink-soft); max-width: 40em; font-size: 1.05rem; }
+
+/* Problem */
+.manual { margin-top: 32px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 0.9rem; }
+.manual span { padding: 8px 12px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; }
+.manual i { font-style: normal; color: var(--ink-soft); }
+.facts { margin-top: 32px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+.fact b { display: block; font: 800 2.4rem/1 var(--display); color: var(--ink); font-variant-numeric: tabular-nums; }
+.fact p { margin-top: 8px; color: var(--ink-soft); font-size: 0.92rem; max-width: 22em; }
+
+/* Pipeline */
+.pipe { margin-top: 32px; list-style: none; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+.pipe li { background: var(--sheet); padding: 22px; display: grid; gap: 8px; align-content: start; }
+.pipe .n { font: 500 0.75rem/1 var(--mono); color: var(--cobalt); }
+.pipe h3 { font-size: 1.15rem; font-weight: 700; }
+.pipe p { color: var(--ink-soft); font-size: 0.92rem; }
+.pipe .who { font: 500 0.68rem/1 var(--mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); }
+.pipe .who.ai { color: var(--cobalt); }
+
+/* Rules */
+.rules { margin-top: 32px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 40px; }
+.rule { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 12px; padding-block: 18px; border-bottom: 1px solid var(--rule); }
+.rule code { font: 500 0.85rem/1.6 var(--mono); color: var(--cobalt); }
+.rule h3 { font: 600 1rem/1.4 var(--body); }
+.rule p { margin-top: 4px; color: var(--ink-soft); font-size: 0.9rem; }
+
+/* Workbook tabs */
+.sheets { margin-top: 32px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.sheet-card { padding: 18px; border: 1px solid var(--rule); border-radius: 8px; background: var(--sheet); }
+.sheet-card h3 { font: 500 0.9rem/1.2 var(--mono); }
+.sheet-card p { margin-top: 8px; font-size: 0.88rem; color: var(--ink-soft); }
+
+/* Scope */
+.scope { margin-top: 32px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px; }
+.scope ul { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 8px; }
+.scope li { padding-left: 22px; position: relative; font-size: 0.95rem; }
+.scope li::before { position: absolute; left: 0; top: 0; font-family: var(--mono); }
+.scope .in li::before { content: "+"; color: var(--manage); }
+.scope .out li::before { content: "–"; color: var(--ink-soft); }
+.scope .out li { color: var(--ink-soft); }
+.road { margin-top: 40px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.road div { border-top: 3px solid var(--rule); padding-top: 12px; }
+.road div.now { border-top-color: var(--cobalt); }
+.road b { font: 600 0.8rem/1 var(--mono); }
+.road p { margin-top: 6px; font-size: 0.88rem; color: var(--ink-soft); }
+
+/* Metrics */
+.metrics { margin-top: 32px; border: 1px solid var(--rule); border-radius: 10px; background: var(--sheet); }
+.metrics td:nth-child(2), .metrics td:nth-child(3), .metrics th:nth-child(2), .metrics th:nth-child(3) { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.metrics td:nth-child(3) { color: var(--cobalt); font-weight: 600; }
+.metrics td { font-size: 0.92rem; }
+
+/* Agents */
+.agent-box { margin-top: 28px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+.agent-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--rule); flex-wrap: wrap; }
+.agent-bar button { font: 500 0.8rem/1 var(--body); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); cursor: pointer; }
+pre { margin: 0; padding: 18px; overflow-x: auto; font: 400 0.78rem/1.55 var(--mono); color: var(--ink); max-height: 420px; }
+
+footer { padding-block: 40px 56px; border-top: 1px solid var(--rule); display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; font-size: 0.85rem; color: var(--ink-soft); }
+
+@media (max-width: 900px) {
+  .hero { grid-template-columns: minmax(0, 1fr); gap: 36px; padding-block: 16px 56px; }
+  .sec { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .pipe, .sheets { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .road { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .facts, .pipe, .sheets, .rules, .scope { grid-template-columns: minmax(0, 1fr); }
+  .facts { gap: 20px; }
+  .top nav { display: none; }
+  section { padding-block: 48px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn:hover { transform: none; }
+}
+
+/* Waitlist form: copied from waitlist/form.py FORM_CSS */
+.wl-form { display: grid; gap: 14px; max-width: 760px; }
+.wl-fields { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto; gap: 12px; align-items: start; }
+.wl-field { display: grid; gap: 6px; min-width: 0; }
+.wl-field label { font: 500 0.85rem/1.3 var(--body); color: var(--ink); }
+.wl-field input, .wl-field select {
+  font: 400 1rem/1.3 var(--body); color: var(--ink); background: var(--sheet);
+  border: 1px solid var(--rule); border-radius: 6px; padding: 11px 12px; min-height: 44px; width: 100%;
+}
+.wl-field input:focus-visible, .wl-field select:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; border-color: var(--cobalt); }
+.wl-field input[aria-invalid="true"], .wl-field select[aria-invalid="true"] { border-color: var(--retire); }
+.wl-error { margin: 0; font-size: 0.875rem; color: var(--retire); }
+/* label line (0.85rem x 1.3) + field gap, so the button lines up with the inputs */
+.wl-submit { min-height: 44px; justify-content: center; white-space: nowrap; margin-top: calc(0.85rem * 1.3 + 6px); }
+.wl-submit:disabled { opacity: 0.7; cursor: progress; }
+.wl-consent { margin: 0; font-size: 0.9rem; line-height: 1.5; color: var(--ink); max-width: 46em; }
+.wl-consent a { color: var(--cobalt); text-decoration: underline; }
+.wl-hp { position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }
+.wl-result { font: 600 1.1rem/1.4 var(--body); color: var(--ink); padding: 16px 18px; border: 1px solid var(--rule); border-radius: 8px; background: var(--sheet); max-width: 760px; }
+.wl-result:focus { outline: 2px solid var(--cobalt); outline-offset: 3px; }
+.wl-result.wl-ok { border-color: var(--manage); }
+.wl-result.wl-bad { border-color: var(--retire); }
+.wl-detail { display: block; margin-top: 4px; font-weight: 400; font-size: 1rem; color: var(--ink); }
+@media (max-width: 600px) {
+  .wl-fields { grid-template-columns: minmax(0, 1fr); }
+  .wl-submit { width: 100%; margin-top: 0; }
+}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="#top" aria-label="Lifecycle Copilot home">
+      <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
+        <rect x="1" y="1" width="24" height="24" rx="6" fill="var(--ink)"/>
+        <rect x="6" y="8" width="14" height="2" rx="1" fill="var(--paper)"/>
+        <rect x="6" y="12" width="10" height="2" rx="1" fill="var(--paper)"/>
+        <rect x="6" y="16" width="6" height="2" rx="1" fill="var(--paper)"/>
+        <circle cx="19" cy="17" r="2.2" fill="var(--paper)"/>
+      </svg>
+      Lifecycle Copilot
+    </a>
+    <nav aria-label="Sections">
+      <a href="#problem">Problem</a>
+      <a href="#how">How it works</a>
+      <a href="#rules">Rules</a>
+      <a href="#scope">Scope</a>
+      <a href="#waitlist">Waitlist</a>
+      <a href="#agents">For agents</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <div class="hero">
+      <div>
+        <p class="label">Technology lifecycle management</p>
+        <h1 style="margin-top:14px">Know what loses vendor support, <em>and when.</em></h1>
+        <p class="lede">Lifecycle Copilot takes your CMDB export and last period's lifecycle sheet, and gives back a finished report. Every asset gets its EOL and EOS dates and a Manage, Renew or Retire call, with the reason written next to it.</p>
+        <div class="cta">
+          <a class="btn primary" href="#waitlist">Join the waitlist</a>
+          <a class="btn ghost" href="#how">See how it works</a>
+        </div>
+        <p class="status-line"><b>●</b> Pilot with one ITAM team · first tower: EUC Windows</p>
+      </div>
+
+      <figure class="ledger" style="margin:0" aria-label="Example rows from a Lifecycle Copilot report">
+        <div class="ledger-head">
+          <div class="tabs" aria-hidden="true">
+            <span class="on">Report</span><span>Summary</span><span>Match Detail</span><span>Dropped</span><span>Data Quality</span>
+          </div>
+          <span class="label">Example data</span>
+        </div>
+        <div class="scroll">
+          <table>
+            <thead>
+              <tr><th>Asset</th><th>OS</th><th>OS EOS</th><th>Decision</th><th>Basis</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="mono">WKS-04417</td>
+                <td>Windows 11 23H2 Enterprise</td>
+                <td class="mono">10-Nov-2026<span class="days hot">17 days</span></td>
+                <td><span class="pill renew">Renew</span></td>
+                <td class="basis">Microsoft servicing date for 23H2, Enterprise edition. Matched on serial.</td>
+              </tr>
+              <tr>
+                <td class="mono">WKS-11902</td>
+                <td>Windows 11 23H2 Pro</td>
+                <td class="mono">11-Nov-2025<span class="days hot">past EOS</span></td>
+                <td><span class="pill retire">Retire</span></td>
+                <td class="basis">Pro edition ended a year before Enterprise. OS changed since last period, so the date was recomputed.</td>
+              </tr>
+              <tr>
+                <td class="mono">MAC-2208</td>
+                <td>macOS 15 Sequoia</td>
+                <td class="mono">30-Sep-2027<span class="days">341 days</span></td>
+                <td><span class="pill manage">Manage</span></td>
+                <td class="basis">Carried forward from prior sheet. Hostname unchanged, same serial.</td>
+              </tr>
+              <tr>
+                <td class="mono">WKS-07731</td>
+                <td>Windows 11 24H2 Enterprise</td>
+                <td class="mono">—<span class="days">needs review</span></td>
+                <td><span class="pill renew" style="background:var(--cobalt-wash);color:var(--cobalt)">Review</span></td>
+                <td class="basis">Duplicate serial with conflicting values. Both rows kept and sent to review.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <figcaption class="ledger-foot">Sample rows, not real assets. Dates as of 24-Oct-2026.</figcaption>
+      </figure>
+    </div>
+
+    <section id="problem">
+      <div class="sec">
+        <p class="label">The problem</p>
+        <div>
+          <h2>The CMDB knows what you own. It doesn't know when any of it stops being supported.</h2>
+          <p class="intro">The lifecycle dates live on Microsoft, Apple and Cisco support pages, per version and per edition. So the report gets built by hand, one tower at a time.</p>
+          <div class="manual" aria-label="The manual process today">
+            <span>Export from ServiceNow</span><i>→</i>
+            <span>Match against last sheet</span><i>→</i>
+            <span>Look up vendor pages</span><i>→</i>
+            <span>Type in dates</span><i>→</i>
+            <span>Decide each row</span><i>→</i>
+            <span>Email the workbook</span>
+          </div>
+          <div class="facts">
+            <div class="fact"><b>~2 days</b><p>to refresh one tower by hand. It's out of date the week after it ships.</p></div>
+            <div class="fact"><b>3 of 9</b><p>towers have never been done, because there was never time.</p></div>
+            <div class="fact"><b>1 person</b><p>can run the whole process. When they're out, there's no report.</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="how">
+      <div class="sec">
+        <p class="label">How it works</p>
+        <div>
+          <h2>Six steps, the same way every time.</h2>
+          <p class="intro">This is the method that already works by hand, turned into software. Matching stays deterministic. AI only helps where the answer is written in prose on a vendor page.</p>
+          <ol class="pipe">
+            <li><span class="n">1</span><h3>Ingest and check</h3><p>Read the export, map the columns, and reject anything that looks like a copy of last period's file.</p><span class="who">Rules</span></li>
+            <li><span class="n">2</span><h3>Match</h3><p>Serial first. Hostname only when it's unique in both files and the serials don't conflict.</p><span class="who">Rules</span></li>
+            <li><span class="n">3</span><h3>Carry forward</h3><p>Matched assets keep their dates and decisions. If the OS changed, the OS dates are recomputed.</p><span class="who">Rules</span></li>
+            <li><span class="n">4</span><h3>Fill the gaps</h3><p>Policy table, then same-model peers, then vendor rules, then cited research on vendor pages.</p><span class="who ai">AI with citations</span></li>
+            <li><span class="n">5</span><h3>Decide</h3><p>Manage, Renew or Retire, with the rationale written out. A human override always sticks.</p><span class="who ai">AI suggests, you approve</span></li>
+            <li><span class="n">6</span><h3>Export</h3><p>A six-sheet workbook that looks like the one your team already uses, with real Excel dates.</p><span class="who">Rules</span></li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <section id="rules">
+      <div class="sec">
+        <p class="label">Rules it won't break</p>
+        <div>
+          <h2>A wrong match quietly corrupts history. These rules stop that.</h2>
+          <div class="rules">
+            <div class="rule"><code>I1</code><div><h3>No fuzzy matching</h3><p>Same hostname with a different serial means the hardware was replaced. That's not a match.</p></div></div>
+            <div class="rule"><code>I2</code><div><h3>Fill blanks only</h3><p>It never overwrites a value from the source or from a person.</p></div></div>
+            <div class="rule"><code>I3</code><div><h3>Every value has a basis</h3><p>Each derived date says where it came from, in the Remarks column.</p></div></div>
+            <div class="rule"><code>I4</code><div><h3>Keep every row</h3><p>Duplicates included. It's a reconciliation, not a cleanup.</p></div></div>
+            <div class="rule"><code>I5</code><div><h3>Show the exceptions</h3><p>Dropped assets and data quality issues ship as their own tabs.</p></div></div>
+            <div class="rule"><code>I6</code><div><h3>Don't trust inbound columns</h3><p>A real export once had a column copied row for row from the old file. Now that gets checked.</p></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="output">
+      <div class="sec">
+        <p class="label">What you get</p>
+        <div>
+          <h2>One workbook, six sheets.</h2>
+          <div class="sheets">
+            <div class="sheet-card"><h3>Report</h3><p>Every source row, in your existing column layout.</p></div>
+            <div class="sheet-card"><h3>Summary</h3><p>Totals: matched, new, dropped, blanks, duplicates.</p></div>
+            <div class="sheet-card"><h3>Matching Logic</h3><p>The rules used in this run, and any caveats.</p></div>
+            <div class="sheet-card"><h3>Match Detail</h3><p>For each asset: how it matched and what changed.</p></div>
+            <div class="sheet-card"><h3>Dropped</h3><p>Assets from last period that are gone now, with the reason.</p></div>
+            <div class="sheet-card"><h3>Data Quality</h3><p>Duplicate serials, reused hostnames, conflicts and anything odd.</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="scope">
+      <div class="sec">
+        <p class="label">Scope</p>
+        <div>
+          <h2>Version 1 does one tower properly.</h2>
+          <div class="scope">
+            <div class="in">
+              <p class="label">In v1</p>
+              <ul>
+                <li>EUC Windows tower</li>
+                <li>Upload the current export and the prior sheet</li>
+                <li>Deterministic matching, fully tested</li>
+                <li>Policy lookup, peer inference and vendor rules</li>
+                <li>Cited research for versions it can't resolve</li>
+                <li>Decisions with rationale, plus review and audit history</li>
+                <li>Six-sheet export</li>
+              </ul>
+            </div>
+            <div class="out">
+              <p class="label">Not yet</p>
+              <ul>
+                <li>Live ServiceNow API</li>
+                <li>Writing back to the CMDB</li>
+                <li>More than one tower</li>
+                <li>SSO and multiple tenants</li>
+                <li>Dashboards and ticketing</li>
+                <li>Acting on a Retire without a person</li>
+              </ul>
+            </div>
+          </div>
+          <div class="road">
+            <div class="now"><b>v1.0</b><p>One tower, upload to workbook. Must match the known-good refresh.</p></div>
+            <div><b>v1.1</b><p>Confidence shown, clickable citations, override screen.</p></div>
+            <div><b>v1.2</b><p>All towers through a config registry.</p></div>
+            <div><b>v2.0</b><p>Scheduled ServiceNow pull and a vendor EOL feed.</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="proof">
+      <div class="sec">
+        <p class="label">How we'll know</p>
+        <div>
+          <h2>Tested against a refresh we already finished by hand.</h2>
+          <p class="intro">The September 2026 EUC Windows refresh is the frozen test set. The right answer is already known, so the tool either gets the same result or it doesn't.</p>
+          <div class="metrics scroll">
+            <table>
+              <thead><tr><th>Measure</th><th>Today</th><th>v1 target</th></tr></thead>
+              <tbody>
+                <tr><td>Hours to refresh one tower</td><td>~16 h</td><td>under 1 h</td></tr>
+                <tr><td>Match reproduction on the test set</td><td>by hand</td><td>100%</td></tr>
+                <tr><td>Vendor dates without a citation</td><td>untracked</td><td>0</td></tr>
+                <tr><td>People who can run a refresh</td><td>1</td><td>3 or more</td></tr>
+                <tr><td>Towers never done</td><td>3 of 9</td><td>0 by v1.2</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="waitlist">
+      <div class="sec">
+        <p class="label">Waitlist</p>
+        <div>
+          <h2>Hear when it's ready for your towers.</h2>
+          <p class="intro">Leave your work email and we'll tell you when Lifecycle Copilot opens beyond the pilot team. We'll email you when it's ready, and only about Lifecycle Copilot. We never share your address.</p>
+          <div style="margin-top:28px">
+<form class="wl-form" id="waitlist-form" action="/api/waitlist" method="post">
+  <div class="wl-fields">
+    <div class="wl-field">
+      <label for="wl-email">Work email</label>
+      <input id="wl-email" name="email" type="email" autocomplete="email" required maxlength="254" value="" aria-describedby="wl-email-error">
+      <p class="wl-error" id="wl-email-error" hidden></p>
+    </div>
+    <div class="wl-field">
+      <label for="wl-role">Your role (optional)</label>
+      <select id="wl-role" name="role" aria-describedby="wl-role-error">
+        <option value="">Choose one</option><option value="itam_analyst">IT asset / ITAM analyst</option><option value="infra_lead">Infrastructure or IT operations lead</option><option value="cmdb_admin">CMDB or ServiceNow admin</option><option value="other">Something else</option>
+      </select>
+      <p class="wl-error" id="wl-role-error" hidden></p>
+    </div>
+    <div class="wl-hp" aria-hidden="true">
+      <label for="wl-hp">Leave this field empty</label>
+      <input id="wl-hp" name="lc_hp" type="text" tabindex="-1" autocomplete="off">
+    </div>
+    <button type="submit" class="btn primary wl-submit" aria-describedby="wl-consent">Join the waitlist</button>
+  </div>
+  <p class="wl-consent" id="wl-consent">We'll only email you about Lifecycle Copilot. Unsubscribe or ask us to delete your email any time. See the <a href="/privacy.html">privacy policy</a>.</p>
+</form>
+            <div class="wl-result" id="wl-result" role="status" aria-live="polite" tabindex="-1" hidden></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="agents">
+      <div class="sec">
+        <p class="label">For agents</p>
+        <div>
+          <h2>Machine-readable spec</h2>
+          <p class="intro">If you're an agent building or reviewing Lifecycle Copilot, start here. The same data sits in the page as <code>application/json</code> under the id <code>product-spec</code>, and as schema.org JSON-LD in the head.</p>
+          <div class="agent-box">
+            <div class="agent-bar">
+              <span class="label">product-spec.json</span>
+              <button type="button" id="copy-spec">Copy JSON</button>
+            </div>
+            <pre id="spec-view"></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>Lifecycle Copilot · built by the TechOps ITAM team</span>
+    <span><a href="/privacy.html">Privacy</a> · <a href="/terms.html">Terms</a> · <a href="/llms.txt">llms.txt</a></span>
+    <span>v0.1 · updated 24-Oct-2026</span>
+  </footer>
+</div>
+
+<script type="application/json" id="product-spec">
+{
+  "name": "Lifecycle Copilot",
+  "version": "0.1",
+  "updated": "2026-10-24",
+  "owner": "Product owner",
+  "one_line": "Turns a raw CMDB export into a decided, defensible technology-lifecycle report in minutes instead of days.",
+  "user": {
+    "primary": "ITAM / TLM analyst who refreshes tower extracts",
+    "consumer": "Infrastructure leadership"
+  },
+  "shape": "Internal tool a team adopted",
+  "metric": {
+    "name": "Hours to refresh one tower, export in hand to finished workbook sent",
+    "baseline_hours": 16,
+    "target_hours": 1,
+    "test_set": "Sep-2026 EUC Windows refresh (known-good answer exists)"
+  },
+  "inputs": ["Current CMDB export (.xlsx)", "Prior period TLM sheet (.xlsx)", "Lifecycle policy table"],
+  "pipeline": ["ingest_and_validate", "match", "carry_forward", "infer_blanks", "decide", "export"],
+  "invariants": {
+    "I1": "No fuzzy matching. Serial first; hostname only if unique in both periods and serials do not conflict.",
+    "I2": "Fill blanks only. Never overwrite source or human values.",
+    "I3": "Every derived value carries its basis in Remarks.",
+    "I4": "Preserve every source row, duplicates included.",
+    "I5": "Publish exceptions (Dropped, Data Quality) as first-class output.",
+    "I6": "Never trust an inbound column. Check for positional copies of the prior file."
+  },
+  "extra_rules": [
+    "Changed OS, version or edition invalidates carried-forward OS dates.",
+    "Missing evidence means Unknown / Needs review, not Manage.",
+    "AI-proposed values stay separate from approved policy facts.",
+    "Retire is a recommendation only.",
+    "AI never matches assets."
+  ],
+  "outputs": ["Report", "Summary", "Matching Logic", "Match Detail", "Dropped", "Data Quality"],
+  "acceptance": [
+    "Same hostname, different serial: no match.",
+    "Changed OS edition does not inherit a stale EOS.",
+    "Ambiguous duplicate serials go to review.",
+    "Every current input row appears in the export.",
+    "Zero vendor dates without a citation."
+  ],
+  "v1_scope": {
+    "in": ["One tower (EUC Windows)", "XLSX upload", "Deterministic matching", "Policy, peer and vendor-rule inference", "Cited LLM research", "Decision with rationale", "Six-sheet export", "DQ register", "SQLite with snapshot history"],
+    "out": ["ServiceNow API", "CMDB write-back", "Multiple towers", "SSO / multi-tenant", "Dashboards", "Ticketing", "Autonomous remediation"]
+  },
+  "stack": ["Python 3.12", "FastAPI", "SQLite (Postgres later)", "openpyxl", "pydantic", "Claude API", "pytest"],
+  "repo_layout": {
+    "docs/": "01-problem-and-user through 07-build-plan",
+    "prompts/": "Reusable Claude Code prompts",
+    "data/sample/": "Synthetic or approved de-identified workbooks only",
+    "output/": "Generated workbooks, not committed",
+    "src/lifecycle_copilot/": "ingest, match, lifecycle, decide, dq, export",
+    "tests/": "One test per invariant plus frozen test set checks"
+  },
+  "status": "Spec and docs in progress. No application code until the build plan is accepted."
+}
+</script>
+<script>
+(function () {
+  // Waitlist: submit in place. Without JS the form posts normally and the
+  // service answers with its own result page.
+  var form = document.getElementById('waitlist-form');
+  if (!form || !window.fetch) return;
+  var email = document.getElementById('wl-email');
+  var role = document.getElementById('wl-role');
+  var trap = document.getElementById('wl-hp');
+  var err = document.getElementById('wl-email-error');
+  var roleErr = document.getElementById('wl-role-error');
+  var result = document.getElementById('wl-result');
+  var button = form.querySelector('button[type="submit"]');
+  var EMAIL_ERROR = 'Enter an email address like name@company.com';
+  form.noValidate = true;
+
+  function showError(text) {
+    var onRole = /role/i.test(text);
+    var box = onRole ? roleErr : err;
+    var field = onRole ? role : email;
+    box.textContent = text;
+    box.hidden = false;
+    field.setAttribute('aria-invalid', 'true');
+    field.focus();
+  }
+  function clearError() {
+    [err, roleErr].forEach(function (box) { box.hidden = true; box.textContent = ''; });
+    email.removeAttribute('aria-invalid');
+    role.removeAttribute('aria-invalid');
+  }
+  function showResult(text, ok) {
+    result.textContent = text;
+    if (ok) {
+      var detail = document.createElement('span');
+      detail.className = 'wl-detail';
+      detail.textContent = "We'll email you when Lifecycle Copilot is ready.";
+      result.appendChild(detail);
+    }
+    result.className = 'wl-result ' + (ok ? 'wl-ok' : 'wl-bad');
+    result.hidden = false;
+    if (ok) form.hidden = true;
+    result.focus();
+  }
+
+  form.addEventListener('submit', function (event) {
+    event.preventDefault();
+    clearError();
+    result.hidden = true;
+    var value = email.value.trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s.]{2,}$/.test(value)) { showError(EMAIL_ERROR); return; }
+    button.disabled = true;
+    var label = button.textContent;
+    button.textContent = 'Joining\u2026';
+    fetch(form.action, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ email: value, role: role.value, lc_hp: trap.value })
+    }).then(function (res) {
+      if (res.status === 429) return { ok: false, message: 'Too many tries. Wait a minute and try again.' };
+      return res.json().catch(function () { return {}; }).then(function (data) {
+        if (res.ok && data.ok) return { ok: true, message: data.message || "You're on the list." };
+        if (res.status === 422) return { ok: false, field: true, message: data.message || EMAIL_ERROR };
+        return { ok: false, message: 'Something went wrong on our side. Try again in a few minutes.' };
+      });
+    }, function () {
+      return { ok: false, message: 'Something went wrong on our side. Try again in a few minutes.' };
+    }).then(function (out) {
+      button.disabled = false;
+      button.textContent = label;
+      if (out.ok) showResult(out.message, true);
+      else if (out.field) showError(out.message);
+      else showResult(out.message, false);
+    });
+  });
+})();
+
+(function () {
+  var raw = document.getElementById('product-spec').textContent.trim();
+  var view = document.getElementById('spec-view');
+  try { view.textContent = JSON.stringify(JSON.parse(raw), null, 2); } catch (e) { view.textContent = raw; }
+  var btn = document.getElementById('copy-spec');
+  btn.addEventListener('click', function () {
+    var done = function () { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy JSON'; }, 1600); };
+    var fallback = function () {
+      var r = document.createRange(); r.selectNodeContents(view);
+      var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      btn.textContent = 'Selected, press Cmd+C';
+    };
+    try {
+      navigator.clipboard.writeText(view.textContent).then(done, fallback);
+    } catch (e) { fallback(); }
+  });
+})();
+</script>

@@ -1,0 +1,33 @@
+# Lifecycle Copilot
+
+> Lifecycle Copilot turns a raw CMDB export and last period's technology lifecycle (TLM) sheet into a finished lifecycle workbook for one infrastructure tower. Every row gets end-of-life and end-of-support dates, a Manage, Renew or Retire recommendation, and the reason behind each value the tool filled in. It's an internal pilot built for IT asset management (ITAM) analysts. The first version covers end-user Windows devices.
+
+Status: pilot, version 0.1, updated 25 October 2026. The tool isn't offered for download or sale on this site. The sample rows on the site are made up, not real assets.
+
+Key facts:
+
+- Input: the current CMDB export (.xlsx) and the prior period's TLM sheet (.xlsx), for one tower.
+- Matching is deterministic, never fuzzy. Serial number first. Hostname only when it's unique in both files and the serials don't conflict. The same hostname with a different serial is treated as replaced hardware, not a match.
+- It only fills blanks and never overwrites a source or human value. Every derived value says where it came from.
+- Every source row is kept, duplicates included. Exceptions (dropped assets, duplicate serials, reused hostnames, copied columns) are output, not hidden.
+- Windows OS dates come from Microsoft's published lifecycle and release-health pages, keyed on version and edition, including LTSC. A date with no source is left blank and marked for review.
+- Output: one Excel workbook with six sheets: Report, Summary, Matching Logic, Match Detail, Dropped, Data Quality.
+- Retire is always a recommendation, never an action.
+- The goal: one tower refresh in about 1 hour of analyst time, down from about 2 days by hand.
+
+## Pages
+
+- [Home](https://memorymanager.stream/): problem, how it works, matching rules, version 1 scope, how it's tested, and a machine-readable product spec
+- [Machine-readable spec](https://memorymanager.stream/#agents): JSON summary of the product (name, version, inputs, outputs, metric)
+
+## Legal
+
+- [Privacy policy](https://memorymanager.stream/privacy.html): the only data collected is the waitlist (email and optional role), stored on the operator's own server. Cloudflare, AWS and Google Fonts see standard request data.
+- [Terms of use](https://memorymanager.stream/terms.html): information only, provided as is; check vendor dates at the source
+
+## Optional
+
+- [Microsoft Windows 11 release information](https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information): the source for current Windows 11 end-of-servicing dates
+- [Microsoft Lifecycle FAQ for Windows](https://learn.microsoft.com/en-us/lifecycle/faq/windows): why Home/Pro and Enterprise/Education editions have different dates
+
+Contact: Shreenath Shetty, shreenathacc22@gmail.com

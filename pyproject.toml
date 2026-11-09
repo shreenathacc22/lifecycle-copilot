@@ -1,0 +1,24 @@
+[project]
+name = "lifecycle-copilot"
+version = "0.1.0"
+description = "Turns a CMDB export and last period's TLM sheet into a lifecycle workbook"
+requires-python = ">=3.12"
+dependencies = ["openpyxl>=3.1"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "httpx2>=2.16"]  # starlette TestClient wants httpx2; plain httpx is deprecated there
+# The web service only: pip install -e ".[waitlist]". The product itself stays openpyxl-only.
+waitlist = ["fastapi>=0.110", "uvicorn>=0.29"]
+
+[project.scripts]
+lifecycle-copilot = "lifecycle_copilot.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lifecycle_copilot", "waitlist"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

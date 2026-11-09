@@ -1,0 +1,8 @@
+# memorymanager.stream
+# Search engines and AI crawlers are welcome to read the whole site.
+# A short summary for language models is at /llms.txt
+
+User-agent: *
+Allow: /
+
+Sitemap: https://memorymanager.stream/sitemap.xml

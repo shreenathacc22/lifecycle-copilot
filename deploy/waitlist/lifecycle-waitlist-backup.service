@@ -1,0 +1,19 @@
+# Daily backup (W10) using dev's `waitlist backup`: SQLite online backup, dated file, keep 7.
+[Unit]
+Description=Back up the waitlist DB, keep 7
+
+[Service]
+Type=oneshot
+User=waitlist
+Group=waitlist
+WorkingDirectory=/opt/lifecycle-waitlist/app
+Environment=WAITLIST_DB=/var/lib/lifecycle-waitlist/waitlist.db
+ExecStart=/opt/lifecycle-waitlist/venv/bin/python -m waitlist backup --dir /var/lib/lifecycle-waitlist/backups --keep 7
+StateDirectory=lifecycle-waitlist
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+IPAddressDeny=any

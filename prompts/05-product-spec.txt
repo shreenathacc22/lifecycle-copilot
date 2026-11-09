@@ -1,0 +1,12 @@
+We are following a spec-driven workflow for Lifecycle Copilot.
+Read docs/01-problem-and-user.md through docs/04-market-scan.md. Treat missing interview evidence as unknown.
+
+First list contradictions, unsupported claims and questions. Then draft docs/05-product-spec.md with: user and job; problem; first-release scope; user stories; inputs and outputs; deterministic matching rules; lifecycle-policy evidence; review workflow; data model; testable acceptance criteria; risks; assumptions; and non-goals.
+
+Scope: one Windows tower. Upload current and prior XLSX reports, preserve every source row, match deterministically, apply approved policies, review exceptions and export six sheets: Report, Summary, Matching Logic, Match Detail, Dropped and Data Quality.
+
+Never fuzzy-match asset identities. Do not overwrite source or human values. Changed OS/version/edition invalidates prior derived OS support dates. Missing evidence means Unknown/Needs review, not Manage. Keep proposed AI findings separate from approved policy facts. Retire is a recommendation only.
+
+Exclude live ServiceNow API access, write-back, multiple towers, ticketing and autonomous remediation. Include citations, review and audit history in v1.
+
+Do not write application code, scaffold an app, install packages or execute a deployment. Only write the requested planning document.

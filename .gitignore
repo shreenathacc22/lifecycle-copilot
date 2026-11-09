@@ -1,0 +1,28 @@
+.env
+output/
+data/*
+!data/sample/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+!data/policy/
+.env.*
+*.db
+.DS_Store
+venv/
+*.egg-info/
+
+# Added for the public repo
+# Secrets: never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.keys*
+credentials*
+id_rsa*
+id_ed25519*
+aws_vm*
+names.txt

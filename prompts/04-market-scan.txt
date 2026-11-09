@@ -1,0 +1,9 @@
+Read docs/01-problem-and-user.md, docs/02-interview-notes.md and docs/03-success-metric.md.
+
+Research current products and workarounds for technology lifecycle reporting for enterprise IT asset analysts. Consider native CMDB/ITAM capabilities, lifecycle-data providers and spreadsheet workflows. Treat these as categories to investigate, not a verified competitor list.
+
+Compare inventory import, version-and-edition lifecycle mapping, reconciliation, source evidence, exception review, human overrides and Excel export. Explain where a small internal tool may add value and where an existing tool may already solve the problem.
+
+Use primary sources for product claims, with URLs and research date. Separate sourced findings, interview evidence and hypotheses. Do not invent prices, interviews or demand. If web access is unavailable, say so and list research tasks instead.
+
+Save the findings to docs/04-market-scan.md. Do not create or modify application code or install dependencies.

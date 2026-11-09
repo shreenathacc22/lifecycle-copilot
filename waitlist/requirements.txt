@@ -1,0 +1,5 @@
+# Server-only install for the waitlist (no product code, no openpyxl):
+#   venv/bin/pip install -r waitlist/requirements.txt
+# Keep in step with the [waitlist] extra in pyproject.toml.
+fastapi>=0.110
+uvicorn>=0.29

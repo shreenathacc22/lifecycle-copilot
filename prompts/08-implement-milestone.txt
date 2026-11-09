@@ -1,0 +1,1 @@
+Implement only the first milestone in docs/07-build-plan.md against the accepted specification. Start with local synthetic data. Keep the change small. Add meaningful checks for row preservation, invalid inputs and the relevant acceptance criteria. Give me the exact setup and run commands, expected output and remaining limitations. Do not deploy or implement later milestones yet.

@@ -1,0 +1,672 @@
+<title>Lifecycle Copilot Prototype</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a working tool. Sticky header with the row-count ledger, step bar, one step visible at a time. Review = queue | item. */
+:root {
+  --bg: #f5f7f5; --surface: #ffffff; --ink: #16201c; --muted: #58655f; --line: #dbe1dd;
+  --accent: #1d5d53; --accent-ink: #ffffff; --accent-soft: #e2eeea;
+  --warn: #8f5a00; --warn-soft: #fbf0d9; --bad: #b0261d; --bad-soft: #fbe6e3;
+  --ok: #276b44; --ok-soft: #e1f1e7; --you: #23302b; --you-ink: #ffffff;
+  --f-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --r: 6px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111614; --surface: #19201d; --ink: #e4ebe7; --muted: #98a59f; --line: #2b3531;
+  --accent: #6dc3b4; --accent-ink: #0d1a17; --accent-soft: #1b322d;
+  --warn: #e3a944; --warn-soft: #362a12; --bad: #f08b81; --bad-soft: #3b1c19;
+  --ok: #72cf98; --ok-soft: #16301f; --you: #dfe7e3; --you-ink: #111614; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #111614; --surface: #19201d; --ink: #e4ebe7; --muted: #98a59f; --line: #2b3531;
+  --accent: #6dc3b4; --accent-ink: #0d1a17; --accent-soft: #1b322d;
+  --warn: #e3a944; --warn-soft: #362a12; --bad: #f08b81; --bad-soft: #3b1c19;
+  --ok: #72cf98; --ok-soft: #16301f; --you: #dfe7e3; --you-ink: #111614; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 400 15px/1.5 var(--f-body); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; line-height: 1.2; }
+h2 { font-size: 1.35rem; font-weight: 600; }
+h3 { font-size: 1.02rem; font-weight: 600; }
+p { margin: 0; max-width: 68ch; }
+.mono { font-family: var(--f-mono); font-size: .9em; }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.label { font-size: .74rem; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a { color: var(--accent); }
+
+/* proto banner */
+.proto { background: var(--warn-soft); color: var(--warn); font-size: .85rem; }
+.proto .wrap { padding-block: 6px; display: flex; gap: 8px 16px; flex-wrap: wrap; justify-content: space-between; }
+
+/* header */
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line); }
+.top .wrap { padding-block: 12px; display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: center; justify-content: space-between; }
+.brand { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.brand h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: -.01em; }
+.ledger { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; font-size: .9rem; }
+.ledger b { font-family: var(--f-mono); font-weight: 500; }
+.ledger .eq.ok b { color: var(--ok); }
+.ledger .eq.bad b { color: var(--bad); }
+.linkbtn { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+
+/* steps */
+nav.steps { border-bottom: 1px solid var(--line); background: var(--surface); }
+nav.steps ol { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; }
+nav.steps li { flex: 1 1 140px; }
+nav.steps button { width: 100%; text-align: left; background: none; border: 0; border-bottom: 3px solid transparent; padding: 10px 4px 9px; cursor: pointer; display: flex; gap: 10px; align-items: center; color: var(--muted); }
+nav.steps button[disabled] { cursor: not-allowed; opacity: .55; }
+nav.steps button .n { width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid currentColor; display: grid; place-items: center; font: 600 .8rem var(--f-display); flex: none; }
+nav.steps button.done .n { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+nav.steps button.cur { color: var(--ink); border-bottom-color: var(--accent); }
+nav.steps button.cur .n { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+nav.steps .t { font-weight: 600; }
+
+main { padding-block: 24px 64px; }
+section.step { display: grid; gap: 20px; }
+.head { display: grid; gap: 6px; }
+
+/* generic blocks */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; display: grid; gap: 12px; min-width: 0; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.btn { border: 1px solid var(--line); background: var(--surface); padding: 8px 14px; border-radius: var(--r); cursor: pointer; font-weight: 600; }
+.btn:hover:not([disabled]) { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.danger { color: var(--bad); }
+.btn[disabled] { opacity: .5; cursor: not-allowed; }
+kbd { font-family: var(--f-mono); font-size: .75rem; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; color: var(--muted); }
+.btn kbd { margin-left: 6px; }
+.btn.primary kbd { color: inherit; border-color: currentColor; opacity: .7; }
+
+/* drop zones */
+.drop { border: 1.5px dashed var(--line); border-radius: var(--r); padding: 16px; display: grid; gap: 10px; background: var(--bg); }
+.drop.loaded { border-style: solid; border-color: var(--accent); background: var(--surface); }
+.file { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; font-size: .9rem; }
+.file dt { color: var(--muted); }
+.file dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+ul.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: .9rem; }
+ul.checks li { display: flex; gap: 8px; align-items: baseline; }
+.tick { color: var(--ok); font-weight: 700; }
+.cross { color: var(--bad); font-weight: 700; }
+.bang { color: var(--warn); font-weight: 700; }
+
+/* alerts */
+.alert { border-radius: var(--r); padding: 16px 18px; display: grid; gap: 10px; border: 1px solid; }
+.alert.bad { background: var(--bad-soft); border-color: var(--bad); }
+.alert.ok { background: var(--ok-soft); border-color: var(--ok); }
+.alert h3 { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.tag { font: 600 .7rem var(--f-body); letter-spacing: .07em; text-transform: uppercase; padding: 2px 7px; border-radius: 3px; }
+.tag.bad { background: var(--bad); color: var(--surface); }
+.tag.ok { background: var(--ok); color: var(--surface); }
+textarea, input[type=text], input[type=date] { width: 100%; max-width: 520px; border: 1px solid var(--line); background: var(--surface); border-radius: var(--r); padding: 7px 10px; }
+
+/* reconciliation sums */
+.sum { display: grid; gap: 6px; font-size: .95rem; }
+.sum .line { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 4px 0; }
+.sum .line b { font-family: var(--f-mono); font-weight: 500; }
+.sum .total { border-top: 1.5px solid var(--ink); padding-top: 8px; font-weight: 600; }
+.sum .op { color: var(--muted); font-family: var(--f-mono); display: inline-block; width: 1.2em; }
+
+/* chips */
+.chip { display: inline-block; font: 600 .7rem/1 var(--f-body); letter-spacing: .03em; padding: 3px 6px; border-radius: 3px; white-space: nowrap; vertical-align: 1px; border: 1px solid transparent; }
+.c-cmdb { border-color: var(--line); color: var(--muted); }
+.c-carried { background: var(--line); color: var(--ink); }
+.c-policy { background: var(--accent); color: var(--accent-ink); }
+.c-peer, .c-rule { border-color: var(--accent); color: var(--accent); }
+.c-ai { border: 1px dashed var(--warn); color: var(--warn); background: var(--warn-soft); }
+.c-you { background: var(--you); color: var(--you-ink); }
+.c-unk { background: var(--bad-soft); color: var(--bad); }
+
+/* tables */
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; white-space: nowrap; }
+th { font-weight: 600; color: var(--muted); font-size: .76rem; letter-spacing: .04em; text-transform: uppercase; background: var(--bg); }
+tr:last-child td { border-bottom: 0; }
+td.changed { background: var(--warn-soft); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* review */
+.review { display: grid; grid-template-columns: minmax(250px, 320px) 1fr; gap: 20px; align-items: start; }
+@media (max-width: 820px) { .review { grid-template-columns: 1fr; } }
+.queue { display: grid; gap: 14px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 72px); min-width: 0; }
+@media (max-width: 820px) { .queue { position: static; } }
+.qgroup { display: grid; gap: 4px; }
+.qgroup .label { display: flex; justify-content: space-between; padding: 0 4px; }
+.qitem { text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: var(--r); padding: 8px 10px 8px 12px; cursor: pointer; display: grid; gap: 2px; border-left-width: 4px; }
+.qitem.open { border-left-color: var(--warn); }
+.qitem.closed { border-left-color: var(--ok); color: var(--muted); }
+.qitem.info { border-left-color: var(--line); }
+.qitem.sel { outline: 2px solid var(--accent); outline-offset: -1px; }
+.qitem .t { font-weight: 600; font-size: .92rem; }
+.qitem .s { font-size: .8rem; color: var(--muted); }
+.detail { display: grid; gap: 16px; min-width: 0; }
+.why { border-left: 3px solid var(--warn); padding: 2px 0 2px 12px; }
+.quote { font-family: var(--f-mono); font-size: .85rem; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; overflow-x: auto; white-space: pre; }
+fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 8px; }
+legend { font-weight: 600; margin-bottom: 6px; padding: 0; }
+.opt { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--line); border-radius: var(--r); padding: 9px 12px; cursor: pointer; background: var(--surface); }
+.opt:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.opt input { margin-top: 4px; accent-color: var(--accent); }
+.done-note { background: var(--ok-soft); border: 1px solid var(--ok); border-radius: var(--r); padding: 10px 14px; display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: space-between; align-items: center; }
+.keys { font-size: .82rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 14px; }
+
+/* export */
+ul.pre { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+ul.pre li { display: grid; grid-template-columns: 22px 1fr; gap: 8px; }
+
+/* toast */
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--you); color: var(--you-ink); padding: 10px 16px; border-radius: var(--r); font-size: .9rem; max-width: calc(100% - 32px); z-index: 20; }
+
+/* legend of chips */
+.chips-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .82rem; color: var(--muted); align-items: center; }
+
+@media (prefers-reduced-motion: no-preference) { .qitem, .opt, .btn { transition: border-color .12s, background-color .12s; } }
+</style>
+
+<div class="proto"><div class="wrap"><span><b>Prototype.</b> Synthetic EUC Windows run. No files are read, nothing is saved, no workbook is produced.</span><span>For operator feedback, see 06-validation.md</span></div></div>
+
+<header class="top"><div class="wrap">
+  <div class="brand"><h1>Lifecycle Copilot</h1><span class="muted">EUC Windows · Oct-2026 refresh</span></div>
+  <div class="ledger" id="ledger"></div>
+</div></header>
+
+<nav class="steps" aria-label="Refresh steps"><div class="wrap"><ol id="steps"></ol></div></nav>
+
+<main class="wrap" id="main"></main>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const CUR = 1240, PRIOR = 1198, SERIAL = 1121, HOST = 38, NEW = 81, DROPPED = 39;
+
+const S = {
+  step: 0, maxStep: 0,
+  files: { cur: true, prior: true },
+  prov: null, provReason: "",
+  sel: 0, history: false,
+  hands: 0, lastInput: Date.now(),
+};
+
+// Review queue. kind decides how the item renders. status: open | closed
+const ITEMS = [
+  { id: "d1", group: "Duplicate serial", kind: "dup", title: "Serial 5CG2141KQ7", sub: "2 rows this period · 1 prior row", status: "open",
+    serial: "5CG2141KQ7",
+    rows: [
+      { r: 212, host: "EUC-LT-04821", model: "HP EliteBook 840 G8", os: "Windows 11 Enterprise 24H2", user: "user-0412", loc: "Bengaluru-2" },
+      { r: 988, host: "EUC-LT-05530", model: "HP EliteBook 840 G8", os: "Windows 11 Enterprise 24H2", user: "user-1177", loc: "Bengaluru-2" },
+    ],
+    prior: { host: "EUC-LT-04821", model: "HP EliteBook 840 G8", os: "Windows 11 Enterprise 23H2", user: "user-0412", loc: "Bengaluru-2" } },
+  { id: "d2", group: "Duplicate serial", kind: "dup", title: "Serial PF3AX9LM", sub: "2 rows this period · 1 prior row", status: "open",
+    serial: "PF3AX9LM",
+    rows: [
+      { r: 431, host: "EUC-LT-02210", model: "Lenovo ThinkPad T14 Gen 2", os: "Windows 11 Pro 24H2", user: "user-0088", loc: "Pune-1" },
+      { r: 1102, host: "EUC-DT-00917", model: "Lenovo ThinkPad T14 Gen 2", os: "Windows 11 Pro 24H2", user: "", loc: "Pune-1" },
+    ],
+    prior: { host: "EUC-LT-02210", model: "Lenovo ThinkPad T14 Gen 2", os: "Windows 11 Pro 24H2", user: "user-0088", loc: "Pune-1" } },
+  { id: "d3", group: "Duplicate serial", kind: "dup", title: "Serial 7HQK2M3", sub: "2 rows this period · no prior row", status: "open",
+    serial: "7HQK2M3",
+    rows: [
+      { r: 77, host: "EUC-LT-06102", model: "Dell Latitude 5420", os: "Windows 11 Enterprise 24H2", user: "user-2290", loc: "Hyderabad-1" },
+      { r: 78, host: "EUC-LT-06103", model: "Dell Latitude 5420", os: "Windows 11 Enterprise 24H2", user: "user-2291", loc: "Hyderabad-1" },
+    ],
+    prior: null },
+  { id: "a1", group: "AI-proposed dates", kind: "ai", title: "Windows 11 Enterprise 23H2", sub: "OS EOS · 27 rows", status: "open",
+    product: "Windows 11", version: "23H2", edition: "Enterprise", field: "OS EOS", n: 27, proposed: "2026-11-11",
+    url: "https://learn.microsoft.com/en-us/lifecycle/products/windows-11-enterprise-and-education",
+    quote: "| Version 23H2 | 10/31/2023 8:00:00 AM | 11/11/2026 6:59:59 AM |",
+    note: "No approved policy row for this version and edition yet. Microsoft publishes the date on its lifecycle page." },
+  { id: "a2", group: "AI-proposed dates", kind: "ainone", title: "OS string “Win10 Ent Eval”", sub: "OS EOS · 9 rows · no citation", status: "open",
+    field: "OS EOS", n: 9, raw: "Win10 Ent Eval" },
+  { id: "n1", group: "Needs review", kind: "nr", title: "Microsoft Surface Laptop 3", sub: "Asset EOS unknown · 11 rows", status: "open",
+    n: 11, model: "Microsoft Surface Laptop 3",
+    reason: "No approved policy row for this model, no peers with a date, and the vendor rule table has nothing for Surface hardware. OS EOS is known (Windows 11 Enterprise 24H2, 13-Oct-2027, Policy).",
+    sample: [["EUC-LT-03311", "Windows 11 Enterprise 24H2", "", "2027-10-13"], ["EUC-LT-03312", "Windows 11 Enterprise 24H2", "", "2027-10-13"], ["EUC-LT-03390", "Windows 11 Enterprise 24H2", "", "2027-10-13"]] },
+  { id: "n2", group: "Needs review", kind: "nr", title: "Blank Model ID", sub: "Asset EOS unknown · 3 rows", status: "open",
+    n: 3, model: "(blank)",
+    reason: "Model ID is empty in this period's export, so no asset dates can be looked up. Last period these rows had no model either.",
+    sample: [["EUC-DT-00412", "Windows 11 Pro 24H2", "", ""], ["EUC-DT-00415", "Windows 11 Pro 24H2", "", ""], ["EUC-LT-07001", "Windows 11 Enterprise 25H2", "", "2028-10-11"]] },
+  { id: "p1", group: "Peer conflict", kind: "peer", title: "Dell Latitude 5420", sub: "Disposition · 47 rows disagree", status: "open",
+    model: "Dell Latitude 5420", a: ["Manage", 41], b: ["Renew", 6] },
+  { id: "i1", group: "Listed only", kind: "info", title: "Hostname reused, different serial", sub: "9 rows · treated as replaced hardware", status: "info",
+    text: "Same hostname in both files, both serials present and different. These are not matched (rule I1). The current row is new and the prior row is in Dropped. Listed in the Data Quality tab." },
+  { id: "i2", group: "Listed only", kind: "info", title: "OS edition or version changed", sub: "212 rows · OS dates recomputed", status: "info",
+    text: "OS name, version or edition changed since last period, so last period's OS EOL/EOS were not carried. They were recomputed from the policy table. Remarks on each row say so. Example: EUC-LT-01877 went from Windows 11 Pro 23H2 to Windows 11 Enterprise 24H2, so OS EOS changed from Carried 11-Nov-2025 to Policy 13-Oct-2027." },
+];
+
+const STEPS = ["Upload", "Check", "Review", "Export"];
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const fmt = (n) => n.toLocaleString("en-GB");
+const fdate = (iso) => iso ? new Date(iso + "T00:00:00").toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }).replace(/ /g, "-") : "";
+const chip = (k, t) => `<span class="chip c-${k}">${t}</span>`;
+const actionable = () => ITEMS.filter(i => i.status !== "info");
+const openCount = () => actionable().filter(i => i.status === "open").length;
+
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.hidden = false;
+  clearTimeout(toast.h); toast.h = setTimeout(() => { t.hidden = true; }, 2600);
+}
+
+function renderLedger() {
+  const ran = S.maxStep >= 1;
+  const out = ran ? CUR : 0;
+  const ok = !ran || out === CUR;
+  const mm = String(Math.floor(S.hands / 60)).padStart(2, "0"), ss = String(S.hands % 60).padStart(2, "0");
+  $("#ledger").innerHTML = `
+    <span class="eq ${ok ? "ok" : "bad"}" title="Every row in this period's export must appear in Report">Rows in <b class="num">${fmt(CUR)}</b> · in Report <b class="num">${ran ? fmt(out) : "—"}</b></span>
+    <span>Open items <b class="num">${ran ? openCount() : "—"}</b></span>
+    <span title="Hands-on time, pauses after 2 min idle. Idea only, needs operator agreement.">Hands-on <b class="num" id="hands">${mm}:${ss}</b></span>
+    <button class="linkbtn" id="histBtn">Run history</button>`;
+  $("#histBtn").onclick = () => { S.history = !S.history; render(); };
+}
+
+function renderSteps() {
+  $("#steps").innerHTML = STEPS.map((t, i) => {
+    const cls = i === S.step ? "cur" : i < S.maxStep || (i <= S.maxStep && i !== S.step) ? "done" : "";
+    return `<li><button data-step="${i}" class="${cls}" ${i > S.maxStep ? "disabled" : ""} ${i === S.step ? 'aria-current="step"' : ""}><span class="n">${i + 1}</span><span class="t">${t}</span></button></li>`;
+  }).join("");
+  document.querySelectorAll("[data-step]").forEach(b => b.onclick = () => go(+b.dataset.step));
+}
+
+function go(i) { S.step = i; S.maxStep = Math.max(S.maxStep, i); S.history = false; render(); window.scrollTo(0, 0); }
+
+/* ---------- 1 Upload ---------- */
+function fileBox(key) {
+  const cur = key === "cur";
+  const name = cur ? "EUC_Windows_CMDB_export_2026-10-21.xlsx" : "EUC-Windows_TLM_2026-09.xlsx";
+  const rows = cur ? CUR : PRIOR;
+  const head = cur ? "This period's CMDB export" : "Last period's TLM sheet";
+  if (!S.files[key]) return `
+    <div class="drop" id="drop-${key}">
+      <h3>${head}</h3>
+      <p class="muted">Drop the .xlsx here, or choose a file. ${cur ? "This is the raw ServiceNow export for EUC Windows." : "This is last period's finished report, the one that was sent."}</p>
+      <div class="row"><button class="btn" data-load="${key}">Choose file</button><span class="muted">Prototype: loads the sample file</span></div>
+    </div>`;
+  const cols = cur
+    ? [["Serial Number", 1], ["Name (hostname)", 1], ["Operating System", 1], ["OS Version", 1], ["OS edition", 1], ["Model ID", 1], ["Assigned To", 1]]
+    : [["Serial Number", 1], ["Hostname / FQDN", 1], ["Operating System EOS", 1], ["Asset EOS", 1], ["Disposition Strategy", 1], ["Remarks/Comment", 1]];
+  return `
+    <div class="drop loaded" id="drop-${key}">
+      <div class="row" style="justify-content:space-between"><h3>${head}</h3><button class="linkbtn" data-clear="${key}">Remove</button></div>
+      <dl class="file">
+        <dt>File</dt><dd class="mono">${name}</dd>
+        <dt>Sheet</dt><dd>${cur ? "Page 1" : "EUC-Windows"}</dd>
+        <dt>Rows</dt><dd class="num">${fmt(rows)}</dd>
+        <dt>Fingerprint</dt><dd class="mono">${cur ? "a91f…3c07" : "5e20…b6d1"}</dd>
+      </dl>
+      <div class="label">Required columns</div>
+      <ul class="checks">${cols.map(([c]) => `<li><span class="tick" aria-label="found">✓</span>${c}</li>`).join("")}</ul>
+      ${cur ? `<p class="muted" style="font-size:.85rem">Dropped on read: Unnamed: 26, Unnamed: 27 (empty columns).</p>` : ""}
+    </div>`;
+}
+
+function stepUpload() {
+  const ready = S.files.cur && S.files.prior;
+  return `<section class="step">
+    <div class="head"><span class="label">Step 1 of 4</span><h2>Upload the two files</h2>
+      <p class="muted">Tower is EUC Windows for this version. Period is read from the file name: <b>Oct-2026</b>.</p></div>
+    <div class="grid2">${fileBox("cur")}${fileBox("prior")}</div>
+    <div class="row"><button class="btn primary" id="runBtn" ${ready ? "" : "disabled"}>Run matching</button>
+      <span class="muted">${ready ? "Both files passed the header check." : "Add both files to continue."}</span></div>
+  </section>`;
+}
+
+/* ---------- 2 Check ---------- */
+function stepCheck() {
+  let prov;
+  if (S.prov === null) prov = `
+    <div class="alert bad" role="alert">
+      <h3><span class="tag bad">Blocking</span>Column “Assigned To” looks copied from last period's file</h3>
+      <p>It matches last period's sheet row for row: <b class="num">1,198 of 1,198</b> rows have the same value in the same position. This usually means the export was built by pasting the old sheet, not pulled fresh from ServiceNow (rule I6).</p>
+      <p>Nothing has been filled or decided yet. Pick one:</p>
+      <div class="row"><button class="btn" id="provStop">Stop and re-export</button></div>
+      <label for="provReason" class="label">Or continue, with a reason for the run log</label>
+      <textarea id="provReason" rows="2" placeholder="e.g. Checked 20 rows against ServiceNow, Assigned To is correct this period">${esc(S.provReason)}</textarea>
+      <div class="row"><button class="btn danger" id="provGo" ${S.provReason.trim().length < 8 ? "disabled" : ""}>I've checked it, continue</button></div>
+    </div>`;
+  else if (S.prov === "stop") prov = `
+    <div class="alert bad"><h3><span class="tag bad">Stopped</span>Run stopped at the provenance check</h3>
+      <p>Ask for a fresh EUC Windows export from ServiceNow, then upload it on step 1. Nothing from this run is kept except the log entry.</p>
+      <div class="row"><button class="btn" id="provUndo">Back to the warning</button><button class="btn" id="toUpload">Go to step 1</button></div></div>`;
+  else prov = `
+    <div class="alert ok"><h3><span class="tag ok">Acknowledged</span>Provenance warning on “Assigned To”</h3>
+      <p>Continued by Operator, 24-Oct-2026 10:42. Reason: “${esc(S.provReason)}”. Shown on the Data Quality tab.</p>
+      <div class="row"><button class="linkbtn" id="provUndo">Undo</button></div></div>`;
+
+  const groups = {};
+  actionable().forEach(i => { groups[i.group] = (groups[i.group] || 0) + 1; });
+
+  return `<section class="step">
+    <div class="head"><span class="label">Step 2 of 4</span><h2>Check the run</h2>
+      <p class="muted">Matching used serial first, then hostname only when it's unique in both files and one serial is blank. No fuzzy matching.</p></div>
+    ${prov}
+    <div class="grid2" ${S.prov === "go" ? "" : 'style="opacity:.55"'} aria-disabled="${S.prov !== "go"}">
+      <div class="panel"><h3>This period's export</h3>
+        <div class="sum">
+          <div class="line"><span><span class="op"></span>Matched by serial</span><b class="num">${fmt(SERIAL)}</b></div>
+          <div class="line"><span><span class="op">+</span>Matched by hostname</span><b class="num">${fmt(HOST)}</b></div>
+          <div class="line"><span><span class="op">+</span>New assets</span><b class="num">${fmt(NEW)}</b></div>
+          <div class="line total"><span><span class="op">=</span>Rows in, all kept in Report</span><b class="num">${fmt(SERIAL + HOST + NEW)}</b></div>
+        </div>
+        <p class="muted" style="font-size:.88rem"><span class="tick">✓</span> Matches the ${fmt(CUR)} rows uploaded.</p>
+      </div>
+      <div class="panel"><h3>Last period's sheet</h3>
+        <div class="sum">
+          <div class="line"><span><span class="op"></span>Matched by serial</span><b class="num">${fmt(SERIAL)}</b></div>
+          <div class="line"><span><span class="op">+</span>Matched by hostname</span><b class="num">${fmt(HOST)}</b></div>
+          <div class="line"><span><span class="op">+</span>Dropped (goes to Dropped tab)</span><b class="num">${fmt(DROPPED)}</b></div>
+          <div class="line total"><span><span class="op">=</span>Prior rows</span><b class="num">${fmt(SERIAL + HOST + DROPPED)}</b></div>
+        </div>
+        <p class="muted" style="font-size:.88rem"><span class="tick">✓</span> Matches the ${fmt(PRIOR)} rows in last period's sheet.</p>
+      </div>
+      <div class="panel"><h3>What changed (no action needed)</h3>
+        <ul class="checks">
+          <li><span class="bang">•</span>212 rows changed OS edition or version. OS dates recomputed, not carried.</li>
+          <li><span class="bang">•</span>9 hostnames reused on different hardware. Not matched.</li>
+          <li><span class="bang">•</span>1,067 rows carried Disposition and Remarks forward.</li>
+          <li><span class="bang">•</span>1,108 blank dates filled from Policy, Peer or Vendor rule.</li>
+        </ul>
+      </div>
+      <div class="panel"><h3>Needs you</h3>
+        <ul class="checks">${Object.entries(groups).map(([g, n]) => `<li><span class="bang">•</span>${g}: ${n} item${n > 1 ? "s" : ""}</li>`).join("")}</ul>
+        <p class="muted" style="font-size:.88rem">Grouped so one decision covers all rows of the same kind. Rough estimate: 15 to 25 minutes.</p>
+        <div class="row"><button class="btn primary" id="toReview" ${S.prov === "go" ? "" : "disabled"}>Start review (${actionable().length} items)</button></div>
+      </div>
+    </div>
+  </section>`;
+}
+
+/* ---------- 3 Review ---------- */
+function queueHtml() {
+  const groups = [];
+  ITEMS.forEach((it, idx) => {
+    let g = groups.find(x => x.name === it.group);
+    if (!g) groups.push(g = { name: it.group, items: [] });
+    g.items.push([it, idx]);
+  });
+  return groups.map(g => {
+    const open = g.items.filter(([i]) => i.status === "open").length;
+    const right = g.name === "Listed only" ? "read only" : open ? `${open} open` : "done";
+    return `<div class="qgroup"><div class="label"><span>${g.name}</span><span>${right}</span></div>
+      ${g.items.map(([i, idx]) => `<button class="qitem ${i.status} ${idx === S.sel ? "sel" : ""}" data-sel="${idx}">
+        <span class="t">${esc(i.title)}</span><span class="s">${esc(i.sub)}${i.status === "closed" ? " · " + esc(i.result) : ""}</span></button>`).join("")}</div>`;
+  }).join("");
+}
+
+function compareTable(it) {
+  const f = ["host", "model", "os", "user", "loc"], lab = ["Hostname", "Model ID", "Operating system", "Assigned To", "Location"];
+  const p = it.prior;
+  return `<div class="tbl"><table>
+    <thead><tr><th>Field</th>${it.rows.map(r => `<th>This period · row ${r.r}</th>`).join("")}<th>Last period</th></tr></thead>
+    <tbody>
+      <tr><td>Serial</td>${it.rows.map(() => `<td class="mono">${it.serial}</td>`).join("")}<td class="mono">${p ? it.serial : "—"}</td></tr>
+      ${f.map((k, j) => `<tr><td>${lab[j]}</td>${it.rows.map(r => `<td class="${p && r[k] !== p[k] ? "changed" : ""}">${esc(r[k] || "(blank)")}</td>`).join("")}<td>${p ? esc(p[k] || "(blank)") : "—"}</td></tr>`).join("")}
+    </tbody></table></div>`;
+}
+
+function itemBody(it) {
+  const closed = it.status === "closed";
+  const doneNote = closed ? `<div class="done-note"><span><b>${esc(it.result)}</b>${it.sticky ? " · applies next period too" : ""}</span><button class="linkbtn" data-undo>Undo</button></div>` : "";
+  const dis = closed ? "disabled" : "";
+
+  if (it.kind === "dup") {
+    const [a, b] = it.rows;
+    const opts = it.prior ? [
+      [`Row ${a.r} (${a.host}) continues last period's ${it.prior.host}. Row ${b.r} is new.`, `Row ${a.r} continues prior`],
+      [`Row ${b.r} (${b.host}) continues last period's ${it.prior.host}. Row ${a.r} is new.`, `Row ${b.r} continues prior`],
+      [`Neither. Both rows are new and last period's row goes to Dropped.`, "Both new"],
+    ] : [
+      [`Both rows are new. Flag the serial for a CMDB fix.`, "Both new, CMDB fix flagged"],
+      [`Leave unresolved for now.`, "Left unresolved"],
+    ];
+    return `<div class="why">Serial <span class="mono">${it.serial}</span> appears twice in this period's export${it.prior ? " and once in last period's sheet" : ""}. Neither row was matched automatically. Both rows stay in Report whatever you pick.</div>
+      ${compareTable(it)}
+      ${doneNote}
+      <fieldset ${dis}><legend>Which row continues the asset?</legend>
+        ${opts.map(([t, r], k) => `<label class="opt"><input type="radio" name="dup" value="${k}" data-res="${esc(r)}" ${it.choice === k ? "checked" : ""}><span>${esc(t)}</span></label>`).join("")}
+      </fieldset>
+      <div class="row"><button class="btn primary" data-act="accept" ${dis}>Save choice<kbd>A</kbd></button></div>`;
+  }
+
+  if (it.kind === "ai") {
+    return `<div class="why">${esc(it.note)}</div>
+      <div class="panel">
+        <div class="row" style="justify-content:space-between"><h3>${esc(it.product)} ${esc(it.edition)} ${esc(it.version)}</h3>${chip("ai", "AI proposed")}</div>
+        <div class="grid2" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
+          <div><div class="label">${esc(it.field)}</div><div style="font:600 1.3rem var(--f-display)">${fdate(it.edited || it.proposed)}</div><div class="muted" style="font-size:.85rem">Ends in 18 days from today</div></div>
+          <div><div class="label">Rows affected</div><div style="font:600 1.3rem var(--f-display)" class="num">${it.n}</div><div class="muted" style="font-size:.85rem">all with blank OS EOS, edition Enterprise</div></div>
+        </div>
+        <div><div class="label">Source</div><a href="${it.url}" target="_blank" rel="noopener">learn.microsoft.com · Windows 11 Enterprise and Education lifecycle</a></div>
+        <div><div class="label">Line it relied on</div><div class="quote">${esc(it.quote)}</div></div>
+      </div>
+      ${doneNote}
+      <div id="editBox" hidden><label for="editDate" class="label">Correct date</label><input type="date" id="editDate" value="${it.edited || it.proposed}"><div class="row" style="margin-top:8px"><button class="btn primary" id="editSave">Save date</button><button class="btn" id="editCancel">Cancel</button></div></div>
+      <label class="row" style="gap:8px"><input type="checkbox" id="promote" ${it.promote ? "checked" : ""} ${dis} style="accent-color:var(--accent)"> Also add to the approved policy table for future runs</label>
+      <div class="row">
+        <button class="btn primary" data-act="accept" ${dis}>Accept for ${it.n} rows<kbd>A</kbd></button>
+        <button class="btn" data-act="edit" ${dis}>Edit date<kbd>E</kbd></button>
+        <button class="btn" data-act="reject" ${dis}>Reject, leave blank<kbd>R</kbd></button>
+      </div>`;
+  }
+
+  if (it.kind === "ainone") {
+    return `<div class="why">The OS string <span class="mono">${esc(it.raw)}</span> couldn't be tied to a published Microsoft product, so no date was proposed. Without a citation the field stays blank.</div>
+      <div class="panel">
+        <div class="row" style="justify-content:space-between"><h3>${esc(it.field)} for ${it.n} rows</h3>${chip("unk", "No citation")}</div>
+        <p>Current value: <b>blank</b>. Disposition for these rows will be <b>Needs review</b> unless you add a date with a source.</p>
+      </div>
+      ${doneNote}
+      <div id="editBox" hidden style="display:grid;gap:8px">
+        <label for="editDate" class="label">Date</label><input type="date" id="editDate">
+        <label for="editUrl" class="label">Source URL (required)</label><input type="text" id="editUrl" placeholder="https://learn.microsoft.com/...">
+        <div class="row"><button class="btn primary" id="editSave">Save date</button><button class="btn" id="editCancel">Cancel</button></div></div>
+      <div class="row">
+        <button class="btn primary" data-act="accept" ${dis}>Leave blank<kbd>A</kbd></button>
+        <button class="btn" data-act="edit" ${dis}>Add a date with source<kbd>E</kbd></button>
+      </div>`;
+  }
+
+  if (it.kind === "nr") {
+    return `<div class="why">${esc(it.reason)}</div>
+      <div class="tbl"><table><thead><tr><th>Hostname</th><th>Operating system</th><th>Asset EOS</th><th>OS EOS</th></tr></thead>
+      <tbody>${it.sample.map(r => `<tr><td class="mono">${r[0]}</td><td>${r[1]}</td><td>${chip("unk", "Unknown")}</td><td>${r[3] ? fdate(r[3]) + " " + chip("policy", "Policy") : chip("unk", "Unknown")}</td></tr>`).join("")}
+      <tr><td colspan="4" class="muted">and ${it.n - it.sample.length} more</td></tr></tbody></table></div>
+      ${doneNote}
+      <fieldset ${dis}><legend>Disposition for all ${it.n} rows</legend>
+        ${[["Needs review", "Leave as Needs review. Shown that way in Report."], ["Manage", "Keep in service."], ["Renew", "Plan replacement or upgrade."], ["Retire", "Recommend retiring. A recommendation only."]].map(([v, t], k) =>
+          `<label class="opt"><input type="radio" name="nr" value="${v}" ${(it.choice ?? "Needs review") === v ? "checked" : ""}><span><b>${v === "Retire" ? "Retire (recommended)" : v}</b> · ${t}</span></label>`).join("")}
+      </fieldset>
+      <label for="nrReason" class="label">Reason (needed for anything other than Needs review)</label>
+      <input type="text" id="nrReason" value="${esc(it.why || "")}" ${dis} placeholder="e.g. Surface Laptop 3 bought 2020, 4-year refresh policy">
+      <div class="row"><button class="btn primary" data-act="accept" ${dis}>Save for ${it.n} rows<kbd>A</kbd></button></div>`;
+  }
+
+  if (it.kind === "peer") {
+    return `<div class="why">Last period, rows with model ${esc(it.model)} didn't agree on Disposition, so peer reuse (rule D1) couldn't pick one.</div>
+      <div class="tbl"><table><thead><tr><th>Last period's Disposition</th><th class="num">Rows</th><th>Example Remarks</th></tr></thead>
+        <tbody><tr><td>${it.a[0]} ${chip("carried", "Carried")}</td><td class="num">${it.a[1]}</td><td class="muted">“In warranty, OS supported”</td></tr>
+        <tr><td>${it.b[0]} ${chip("carried", "Carried")}</td><td class="num">${it.b[1]}</td><td class="muted">“Battery swelling reported, refresh Q1”</td></tr></tbody></table></div>
+      ${doneNote}
+      <fieldset ${dis}><legend>What should these rows get?</legend>
+        ${[["keep", "Keep each row's own value from last period (no change)"], ["a", `${it.a[0]} for all ${it.a[1] + it.b[1]} rows`], ["b", `${it.b[0]} for all ${it.a[1] + it.b[1]} rows`]].map(([v, t]) =>
+          `<label class="opt"><input type="radio" name="peer" value="${v}" ${(it.choice ?? "keep") === v ? "checked" : ""}><span>${t}</span></label>`).join("")}
+      </fieldset>
+      <div class="row"><button class="btn primary" data-act="accept" ${dis}>Save<kbd>A</kbd></button></div>`;
+  }
+
+  return `<div class="panel"><p>${esc(it.text)}</p><p class="muted">Read only. Question for the operator: should these need a click, or is listing them enough?</p></div>`;
+}
+
+function stepReview() {
+  const it = ITEMS[S.sel];
+  return `<section class="step">
+    <div class="head"><span class="label">Step 3 of 4</span><h2>Review what needs you</h2>
+      <div class="chips-legend"><span>Where values came from:</span>${chip("cmdb", "From CMDB")}${chip("carried", "Carried")}${chip("policy", "Policy")}${chip("peer", "Peer")}${chip("rule", "Vendor rule")}${chip("ai", "AI proposed")}${chip("you", "You")}${chip("unk", "Unknown")}</div></div>
+    <div class="review">
+      <div class="queue" aria-label="Review queue">${queueHtml()}</div>
+      <div class="detail">
+        <div class="row" style="justify-content:space-between"><div><span class="label">${esc(it.group)}</span><h2>${esc(it.title)}</h2></div>
+          <div class="keys"><span><kbd>J</kbd>/<kbd>K</kbd> next / previous</span><span><kbd>A</kbd> accept</span><span><kbd>E</kbd> edit</span><span><kbd>R</kbd> reject</span></div></div>
+        ${itemBody(it)}
+        <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);padding-top:14px">
+          <span class="muted">${openCount() ? `${openCount()} items still open. You can export with open items; they'll be counted.` : "All items reviewed."}</span>
+          <button class="btn ${openCount() ? "" : "primary"}" id="toExport">Go to export</button></div>
+      </div>
+    </div>
+  </section>`;
+}
+
+function close(it, result, sticky = true) {
+  it.status = "closed"; it.result = result; it.sticky = sticky;
+  toast(`${result}${sticky ? ". Applies next period too." : ""}`);
+  const next = ITEMS.findIndex((x, i) => i > S.sel && x.status === "open");
+  const any = ITEMS.findIndex(x => x.status === "open");
+  if (next >= 0) S.sel = next; else if (any >= 0) S.sel = any;
+  render();
+}
+
+function act(kind) {
+  const it = ITEMS[S.sel];
+  if (it.status !== "open") return;
+  if (it.kind === "dup" && kind === "accept") {
+    const r = document.querySelector('input[name="dup"]:checked');
+    if (!r) return toast("Pick an option first.");
+    it.choice = +r.value; return close(it, r.dataset.res);
+  }
+  if (it.kind === "ai") {
+    it.promote = $("#promote")?.checked;
+    if (kind === "accept") return close(it, `Accepted ${fdate(it.edited || it.proposed)} for ${it.n} rows${it.promote ? ", added to policy" : ""}`);
+    if (kind === "reject") return close(it, `Rejected, OS EOS left blank for ${it.n} rows`);
+    if (kind === "edit") { $("#editBox").hidden = false; $("#editDate").focus(); return; }
+  }
+  if (it.kind === "ainone") {
+    if (kind === "accept") return close(it, `Left blank, ${it.n} rows stay Needs review`, false);
+    if (kind === "edit") { $("#editBox").hidden = false; $("#editDate").focus(); return; }
+  }
+  if (it.kind === "nr" && kind === "accept") {
+    const v = document.querySelector('input[name="nr"]:checked').value;
+    const why = $("#nrReason").value.trim();
+    if (v !== "Needs review" && why.length < 5) { $("#nrReason").focus(); return toast("Add a short reason for this Disposition."); }
+    it.choice = v; it.why = why;
+    return close(it, v === "Needs review" ? `Left as Needs review` : `${v} for ${it.n} rows`, v !== "Needs review");
+  }
+  if (it.kind === "peer" && kind === "accept") {
+    const v = document.querySelector('input[name="peer"]:checked').value;
+    it.choice = v;
+    return close(it, v === "keep" ? "Kept each row's own value" : `${v === "a" ? it.a[0] : it.b[0]} for all ${it.a[1] + it.b[1]} rows`);
+  }
+}
+
+/* ---------- 4 Export ---------- */
+function stepExport() {
+  const open = openCount();
+  const dq = 6 + 9 + 1 + 1 + 14;
+  const sheets = [["Report", fmt(CUR), "Every row from this period's export, same columns and headers as last period's sheet"],
+    ["Summary", "1 page", "Rows in, matched, new, dropped, blanks left, open review items"],
+    ["Matching Logic", "1 page", "The rules used in this run"],
+    ["Match Detail", fmt(CUR), "How each row was matched and what changed"],
+    ["Dropped", fmt(DROPPED), "Last period's rows with no match, with the reason"],
+    ["Data Quality", fmt(dq), "Duplicates, reused hostnames, the provenance warning, unknowns"]];
+  return `<section class="step">
+    <div class="head"><span class="label">Step 4 of 4</span><h2>Export the workbook</h2></div>
+    <div class="grid2">
+      <div class="panel"><h3>Before you send it</h3>
+        <ul class="pre">
+          <li><span class="tick">✓</span><span>Rows in = rows in Report (<span class="num">${fmt(CUR)} = ${fmt(CUR)}</span>)</span></li>
+          <li>${S.prov === "go" ? `<span class="tick">✓</span><span>Provenance warning acknowledged by Operator. Reason is on the Data Quality tab.</span>` : `<span class="cross">✕</span><span>Provenance warning not resolved. Go back to step 2.</span>`}</li>
+          <li>${open ? `<span class="bang">!</span><span><b>${open} review item${open > 1 ? "s" : ""} open.</b> Those rows show as Needs review in Report and are counted in Summary.</span>` : `<span class="tick">✓</span><span>All review items done.</span>`}</li>
+          <li><span class="tick">✓</span><span>No vendor date without a citation.</span></li>
+          <li><span class="tick">✓</span><span>All date columns are real Excel dates.</span></li>
+        </ul>
+        <div class="row"><button class="btn primary" id="dl" ${S.prov === "go" ? "" : "disabled"}>Download workbook</button><span class="mono muted" style="font-size:.82rem">EUC-Windows_TLM_2026-10.xlsx</span></div>
+      </div>
+      <div class="panel" style="padding:0;overflow:hidden"><div class="tbl" style="border:0;border-radius:0"><table>
+        <thead><tr><th>Sheet</th><th class="num">Rows</th><th>What's in it</th></tr></thead>
+        <tbody>${sheets.map(s => `<tr><td><b>${s[0]}</b></td><td class="num">${s[1]}</td><td style="white-space:normal;min-width:220px">${s[2]}</td></tr>`).join("")}</tbody></table></div></div>
+    </div>
+  </section>`;
+}
+
+/* ---------- history ---------- */
+function history() {
+  const runs = [["24-Oct-2026", "Oct-2026", "Operator", "a91f…3c07 / 5e20…b6d1", "1,240", String(openCount()), "in progress"],
+    ["Sep-2026", "Sep-2026", "Done by hand", "n/a", "1,198", "n/a", "about 16 h (estimate)"]];
+  return `<section class="step"><div class="head"><span class="label">Run history</span><h2>Past runs for EUC Windows</h2>
+    <p class="muted">What was sent, from which files, and how long it took.</p></div>
+    <div class="tbl"><table><thead><tr><th>Date</th><th>Period</th><th>Run by</th><th>File fingerprints (current / prior)</th><th class="num">Rows in</th><th class="num">Open at export</th><th>Hands-on</th></tr></thead>
+    <tbody>${runs.map(r => `<tr>${r.map((c, i) => `<td class="${i === 3 ? "mono" : i === 4 || i === 5 ? "num" : ""}">${c}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
+    <div class="row"><button class="btn" id="histClose">Back to the refresh</button></div></section>`;
+}
+
+/* ---------- wiring ---------- */
+function render() {
+  renderLedger(); renderSteps();
+  const m = $("#main");
+  m.innerHTML = S.history ? history() : [stepUpload, stepCheck, stepReview, stepExport][S.step]();
+  if (S.history) { $("#histClose").onclick = () => { S.history = false; render(); }; return; }
+
+  document.querySelectorAll("[data-load]").forEach(b => b.onclick = () => { S.files[b.dataset.load] = true; render(); });
+  document.querySelectorAll("[data-clear]").forEach(b => b.onclick = () => { S.files[b.dataset.clear] = false; render(); });
+  $("#runBtn") && ($("#runBtn").onclick = () => go(1));
+
+  if (S.step === 1) {
+    const ta = $("#provReason");
+    if (ta) ta.oninput = () => { S.provReason = ta.value; $("#provGo").disabled = ta.value.trim().length < 8; };
+    $("#provStop") && ($("#provStop").onclick = () => { S.prov = "stop"; render(); });
+    $("#provGo") && ($("#provGo").onclick = () => { S.prov = "go"; render(); });
+    $("#provUndo") && ($("#provUndo").onclick = () => { S.prov = null; render(); });
+    $("#toUpload") && ($("#toUpload").onclick = () => go(0));
+    $("#toReview") && ($("#toReview").onclick = () => go(2));
+  }
+  if (S.step === 2) {
+    document.querySelectorAll("[data-sel]").forEach(b => b.onclick = () => { S.sel = +b.dataset.sel; render(); });
+    document.querySelectorAll("[data-act]").forEach(b => b.onclick = () => act(b.dataset.act));
+    $("[data-undo]") && ($("[data-undo]").onclick = () => { const it = ITEMS[S.sel]; it.status = "open"; it.result = ""; render(); });
+    const it = ITEMS[S.sel];
+    if ($("#editSave")) $("#editSave").onclick = () => {
+      const d = $("#editDate").value;
+      if (!d) return toast("Pick a date.");
+      if (it.kind === "ainone") {
+        const u = $("#editUrl").value.trim();
+        if (!/^https?:\/\/\S+\.\S+/.test(u)) { $("#editUrl").focus(); return toast("Add the source URL. No date goes out without one."); }
+        return close(it, `Added ${fdate(d)} for ${it.n} rows with source`);
+      }
+      it.edited = d; it.promote = $("#promote")?.checked;
+      close(it, `Edited to ${fdate(d)} for ${it.n} rows${it.promote ? ", added to policy" : ""}`);
+    };
+    if ($("#editCancel")) $("#editCancel").onclick = () => { $("#editBox").hidden = true; };
+    $("#toExport").onclick = () => go(3);
+  }
+  if (S.step === 3) $("#dl").onclick = () => toast("Prototype: no workbook is produced. In the real tool this downloads the six-sheet .xlsx.");
+}
+
+document.addEventListener("keydown", (e) => {
+  S.lastInput = Date.now();
+  if (S.step !== 2 || S.history) return;
+  if (e.target.closest("input, textarea, select") || e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (k === "j" || k === "k") { S.sel = (S.sel + (k === "j" ? 1 : -1) + ITEMS.length) % ITEMS.length; render(); e.preventDefault(); }
+  else if (k === "a") act("accept");
+  else if (k === "e") act("edit");
+  else if (k === "r") act("reject");
+});
+["pointerdown", "pointermove", "scroll"].forEach(ev => document.addEventListener(ev, () => { S.lastInput = Date.now(); }, { passive: true }));
+
+setInterval(() => {
+  if (document.visibilityState === "visible" && Date.now() - S.lastInput < 120000) {
+    S.hands++;
+    const h = $("#hands");
+    if (h) h.textContent = `${String(Math.floor(S.hands / 60)).padStart(2, "0")}:${String(S.hands % 60).padStart(2, "0")}`;
+  }
+}, 1000);
+
+render();
+</script>
